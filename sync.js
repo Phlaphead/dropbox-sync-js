@@ -85,11 +85,6 @@ function setup(callback)
 			// Get access token and continue
 			settings = JSON.parse(data);
 			initialSetup(callback);
-
-			//app = dbox.app(settings.app_key);
-			//client = app.client(settings.access_token);
-
-			//callback();
 		}
 	});
 }
@@ -118,14 +113,13 @@ function getAppKey(callback)
 {
 	if(!settings.app_key)
 	{
-		//https://www.dropbox.com/developers/apps
 		console.log();
 		console.log("Please visit https://www.dropbox.com/developers/apps and create and app with the following details:");
 		console.log("App type: Core API");
 		console.log("App name: NodeJSClient_" + Math.floor(Math.random()*Math.pow(2,32)).toString(16));
 		console.log("Access:   App folder");
 		console.log();
-		console.log("App key:");
+		console.log("Enter app key:");
 
 		settings.app_key = {};
 
@@ -148,7 +142,7 @@ function getAppSecret(callback)
 {
 	if(!settings.app_key.app_secret)
 	{
-		console.log("App secret:");
+		console.log("Enter app secret:");
 
 		process.stdin.resume();
 		process.stdin.once('data', function(chunk) 
