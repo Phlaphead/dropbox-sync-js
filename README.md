@@ -69,8 +69,8 @@ Configuration is stored in the file ~/.dropbox_settings (where ~ is your home di
 
 ## Tested Environemnts
 
-Angstrom Linux / BeagleBone
-Windows
+* Angstrom Linux / BeagleBone
+* Windows
 
 If you have successfully used this script on other platforms please let me know.
 
