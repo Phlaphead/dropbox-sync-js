@@ -1,0 +1,8 @@
+{
+  "name": "dropbox_client",
+  "version": "0.1.0",
+  "dependencies": 
+  {
+    "dbox": "0.5.6"
+  }
+}
