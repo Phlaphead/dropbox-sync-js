@@ -1,4 +1,3 @@
-
 # dropbox-sync-js
 
 This is a node.js script which provides a two way sync between a local folder and a dropbox folder. This is useful for use on systems where the dropbox client is not available such as ARM systems (e.g. BeagleBone, Raspberry Pi).
@@ -67,13 +66,18 @@ This performs the following operations in this order:
 Configuration is stored in the file ~/.dropbox_settings (where ~ is your home directory). Changes to configuration can be made by editing this file, or deleting it and running the script again.
 
 
-## Tested Environemnts
+## Tested Environments
 
 * Angstrom Linux / BeagleBone
 * Windows
 
 If you have successfully used this script on other platforms please let me know.
 
+
+## To Do
+
+* Add ability to sync multiple folders
+* Add exclude folders and patterns
 
 ## Disclaimer
 
