@@ -81,7 +81,7 @@ If you have successfully used this script on other platforms please let me know.
 
 ## Disclaimer
 
-This script is provided "as is" and I cannot guarantee that it is free of defects, and you sue it at your own risk.
+This script is provided "as is" and I cannot guarantee that it is free of defects, and you use it at your own risk.
 
 I do not accept any responsibilty for any loss of data or damage caused due to the use of this software.
 
