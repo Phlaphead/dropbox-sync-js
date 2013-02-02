@@ -41,12 +41,34 @@ function main()
 	{
 		if(process.argv[2] == "exclude")
 		{
+			if(process.argv.length == 4)
+			{
+				var pattern = process.argv[3];
+				addExcludePattern(pattern);
+			}
+			else
+			{
+				getExcludePatterns();
+			}
+		}
+		else if(process.argv[2] == "include")
+		{
 			var pattern = process.argv[3];
-			addExcludePattern(pattern);
+			removeExcludePattern(pattern);
 		}
 		else if(process.argv[2] == "quota")
 		{
-			//getQuota();
+			getQuota();
+		}
+		else
+		{
+			console.log("Usage:")
+			console.log();
+			console.log("node sync.js                     Sync local and remote folders.");
+			console.log("node sync.js exclude             List exclude patterns.");
+			console.log("node sync.js exclude [pattern]   Add an exclude pattern. Can contain wildcards * and ?");
+			console.log("node sync.js include [pattern]   Remove an exclude pattern.");
+			console.log("node sync.js quota               Lists space quota and amount used.")
 		}
 	}
 }
@@ -88,8 +110,86 @@ function addExcludePattern(pattern)
 			}
 		}
 
+		console.log("Adding exclude pattern: " + pattern);
+
 		settings.exclude.push(pattern);
 		saveSettings();
+	});
+}
+
+function removeExcludePattern(pattern)
+{
+	async.series(
+	[
+		readSettings,
+	], 
+	function()
+	{
+		if(!settings.exclude)
+		{
+			return;
+		}
+
+		var found = false;
+
+		// check if pattern is already used
+		for(var i = 0; i < settings.exclude.length; i++)
+		{
+			if(settings.exclude[i] == pattern)
+			{
+				console.log("Removing exclude pattern: " + pattern);
+				settings.exclude.splice(i, 1);
+				found = true;
+				break;
+			}
+		}
+
+		if(!found)
+		{
+			console.log("Exclude pattern not found: " + pattern);
+		}
+
+		saveSettings();
+	});
+}
+
+function getExcludePatterns()
+{
+	async.series(
+	[
+		readSettings,
+	], 
+	function()
+	{
+		if(!settings.exclude)
+		{
+			settings.exclude = [];
+		}
+
+		// check if pattern is already used
+		for(var i = 0; i < settings.exclude.length; i++)
+		{
+			console.log(settings.exclude[i]);
+		}
+	});
+}
+
+function getQuota()
+{
+	async.series(
+	[
+		readSettings,
+	], 
+	function()
+	{
+		client.account(function(status, reply)
+		{
+			var quota = reply.quota_info.quota / (1024 * 1024 * 1024);
+			var normal = (reply.quota_info.normal / (1024 * 1024 * 1024));
+			var shared = reply.quota_info.shared / (1024 * 1024 * 1024);
+  			console.log("Quota:  " + quota.toFixed(3) + " Gb");
+  			console.log("Used:   " + (normal+shared).toFixed(3) + " Gb (" + (((normal+shared)/quota)*100).toFixed(1) + "%)");
+		})
 	});
 }
 
@@ -293,11 +393,16 @@ function getSyncDirectory(callback)
 function saveSettings(callback)
 {
 	var buffer = JSON.stringify(settings);
-	fs.writeFile(settings_path, buffer);
-	if(typeof callback == "function")
+
+	// writeFile doesn't seem to overwrite entire contents of file so need to delete file first.
+	fs.unlink(settings_path, function() 
 	{
-		callback();
-	}
+		fs.writeFile(settings_path, buffer);
+		if(typeof callback == "function")
+		{
+			callback();
+		}
+	});
 }
 
 

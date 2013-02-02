@@ -52,6 +52,8 @@ If the local folder doesn't exist and a folder already exists in dropbox then it
 
 ## Usage
 
+### Syncing
+
 After configuration the saem command is used to do a sync:
 
 	node sync.js
@@ -66,6 +68,40 @@ This performs the following operations in this order:
 Configuration is stored in the file ~/.dropbox_settings (where ~ is your home directory). Changes to configuration can be made by editing this file, or deleting it and running the script again.
 
 
+### Excluding Files
+
+To add an exclude pattern, use the command:
+
+	node sync.js exclude [pattern]
+
+Where [pattern] is the pattern of the file or directory you want to exclude. It can contain * and ? wildcard characters.
+
+e.g.
+
+	node sync.js exclude *~
+	node sync.js exclude .git
+	node sync.js exclude build
+
+Use exclude without a pattern to list all of the exclude patterns currently in use.
+
+If the excluded files have already been synced then they will be removed from dropbox during the next sync.
+
+To remove and excluded pattern use the include command:
+
+	node sync.js include build
+
+This will remove the pattern from the exclude list.
+
+
+### Quota
+
+This command:
+
+	node sync.js quota
+
+Will tell you your dropbox quota and the amount of space used.
+
+
 ## Tested Environments
 
 * Angstrom Linux / BeagleBone
@@ -77,7 +113,7 @@ If you have successfully used this script on other platforms please let me know.
 ## To Do
 
 * Add ability to sync multiple folders
-* Add exclude folders and patterns
+
 
 ## Disclaimer
 
