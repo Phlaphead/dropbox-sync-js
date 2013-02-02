@@ -29,9 +29,29 @@ var queue = async.queue(doTask, 1);
 var finished;
 
 
-/**************************** Startup Functions *******************************/
+/**************************** Main Functions *******************************/
 
-function start(callback)
+function main()
+{
+	if(process.argv.length == 2)
+	{
+		doSync();
+	}
+	else
+	{
+		if(process.argv[2] == "exclude")
+		{
+			var pattern = process.argv[3];
+			addExcludePattern(pattern);
+		}
+		else if(process.argv[2] == "quota")
+		{
+			//getQuota();
+		}
+	}
+}
+
+function doSync(callback)
 {	
 	remote_delta_finished = false;
 	local_delta_finished = false;
@@ -39,10 +59,62 @@ function start(callback)
 	finished = callback;
 	async.series(
 	[
-		setup,
+		readSettings,
 		readSyncDataFile,
-		sync
+		startSync
 	]);
+}
+
+
+function addExcludePattern(pattern)
+{
+	async.series(
+	[
+		readSettings,
+	], 
+	function()
+	{
+		if(!settings.exclude)
+		{
+			settings.exclude = [];
+		}
+
+		// check if pattern is already used
+		for(var i = 0; i < settings.exclude.length; i++)
+		{
+			if(settings.exclude[i] == pattern)
+			{
+				return;
+			}
+		}
+
+		settings.exclude.push(pattern);
+		saveSettings();
+	});
+}
+
+/****************************** Read Settings *********************************/
+
+function readSettings(callback)
+{
+	sync_data_path = getUserHome() + "/" + sync_data_file;
+	settings_path = getUserHome() + "/" + settings_file;
+
+	fs.readFile(settings_path, "utf8", function(error, data)
+	{
+		if(error && error.code == "ENOENT")
+		{
+			// settings file doesn't exist.
+			settings = {};
+			initialSetup(callback);
+		}
+		else if(!error)
+		{
+			// Get access token and continue
+			settings = JSON.parse(data);
+			initialSetup(callback);
+		}
+	});
 }
 
 
@@ -61,31 +133,6 @@ function readSyncDataFile(callback)
 			saved_sync_data.files = {};
 		}
 		callback();
-	});
-}
-
-
-
-function setup(callback)
-{
-	console.log("Connecting...");
-	sync_data_path = getUserHome() + "/" + sync_data_file;
-	settings_path = getUserHome() + "/" + settings_file;
-
-	fs.readFile(settings_path, "utf8", function(error, data)
-	{
-		if(error && error.code == "ENOENT")
-		{
-			// settings file doesn't exist.
-			settings = {};
-			initialSetup(callback);
-		}
-		else if(!error)
-		{
-			// Get access token and continue
-			settings = JSON.parse(data);
-			initialSetup(callback);
-		}
 	});
 }
 
@@ -247,13 +294,16 @@ function saveSettings(callback)
 {
 	var buffer = JSON.stringify(settings);
 	fs.writeFile(settings_path, buffer);
-	callback();
+	if(typeof callback == "function")
+	{
+		callback();
+	}
 }
 
 
-/****************************** Delta Functions *******************************/
+/****************************** Sync Functions *******************************/
 
-function sync()
+function startSync()
 {
 	getLocalDelta();
 }
@@ -305,28 +355,29 @@ function getRemoteDelta()
 
 				var local_path = getLocalPath(remote_path);
 				var sync_data = saved_sync_data.files[local_path];
+				var excluded = isExcluded(local_path);
 				
-				if(!remote_data && sync_data && sync_data.type == "f")
+				if(!excluded && !remote_data && sync_data && sync_data.type == "f")
 				{
 					// Remote file was deleted and there is a local file, so delete local file
 					addTask("rm local", rmLocal, {remote_path: remote_path, local_path: local_path});
 				}
-				else if(!remote_data && sync_data && sync_data.type == "d")
+				else if(!excluded && !remote_data && sync_data && sync_data.type == "d")
 				{
 					// Remote directory was deleted and there is a local directory, so delete local directory
 					addTask("rmdir local", rmdirLocal, {remote_path: remote_path, local_path: local_path});
 				}
-				else if(remote_data && remote_data.is_dir && !sync_data)
+				else if(!excluded && remote_data && remote_data.is_dir && !sync_data)
 				{
 					// Remote directory was created and we don't have it, so create local directory
 					addTask("mkdir local", mkdirLocal, {remote_path: remote_path, local_path: local_path});
 				}
-				else if(remote_data && !remote_data.is_dir && !sync_data)
+				else if(!excluded && remote_data && !remote_data.is_dir && !sync_data)
 				{
 					// Remote file was added and we don't have it, so download it
 					addTask("download", download, {remote_path: remote_path, local_path: local_path});
 				}
-				else if(remote_data && !remote_data.is_dir && sync_data && remote_data.revision > sync_data.rev)
+				else if(!excluded && remote_data && !remote_data.is_dir && sync_data && remote_data.revision > sync_data.rev)
 				{
 					// Remote file was changed and is a later revision than local one
 					addTask("download", download, {remote_path: remote_path, local_path: local_path});
@@ -354,34 +405,48 @@ function getLocalDelta()
 	{
 		if (error) throw error;
 		
+		// for each local file
 		for(var path in file_list)
 		{
 			var file_data = file_list[path];
 			var sync_data = saved_sync_data.files[path];
-			
-			if(!sync_data && file_data.type == 'f')
+			var excluded = isExcluded(path);
+
+			if(!sync_data && !excluded && file_data.type == 'f')
 			{
 				// File has never been synced so it needs to be uploaded.
 				addTask("upload", upload, {local_path: path});
 			}
-			else if(!sync_data && file_data.type == 'd')
+			else if(!sync_data && !excluded && file_data.type == 'd')
 			{
 				// Directory has never been synced so it needs to be uploaded.
 				addTask("mkdir remote", mkdirRemote, {local_path: path});
 			}
-			else if(sync_data && !sync_data.ignore && file_data.mod_time > new Date(Date.parse(sync_data.date)))
+			else if(sync_data && !excluded && !sync_data.ignore && file_data.mod_time > new Date(Date.parse(sync_data.date)))
 			{
 				// File has been modified after last sync.
 				addTask("upload", upload, {local_path: path});
 			}
 		}
 		
+		// for each local file synced previously
 		for(path in saved_sync_data.files)
 		{
 			var file_data = file_list[path];
 			var sync_data = saved_sync_data.files[path];
+			var excluded = isExcluded(path);
 			
-			if(!file_data && (!sync_data.type || sync_data.type == "f"))
+			if(excluded && (!sync_data.type || sync_data.type == "f"))
+			{
+				//File has been previously synced but is now excluded
+				addTask("rm remote", rmRemote, {local_path: path});
+			}
+			else if(excluded && (!sync_data.type || sync_data.type == "d"))
+			{
+				//Directory has been previously synced but is now excluded
+				addTask("rmdir remote", rmdirRemote, {local_path: path});
+			}
+			else if(!file_data && (!sync_data.type || sync_data.type == "f"))
 			{
 				//File previously synced has been deleted
 				addTask("rm remote", rmRemote, {local_path: path});
@@ -940,6 +1005,27 @@ function saveFileSyncData()
 	});
 }
 
+function isExcluded(path)
+{
+	var pathItems = path.split("/");
+	var name = pathItems[pathItems.length-1];
+
+	for(var i = 0; i < settings.exclude.length; i++)
+	{
+		for(var j = 0; j < pathItems.length; j++)
+		{
+			var pattern = settings.exclude[i];
+			var regex = globToRegex(pattern);
+			if(regex.test(pathItems[j]))
+			{
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
 
 function logError(error)
 {
@@ -978,6 +1064,42 @@ function collect()
 	return ret;
 }
 
-exports.start = start;
 
-start();
+
+/**
+ * Convert glob (wildcards * and ?) to a regex.
+ */
+function globToRegex(glob) 
+{
+    var specialChars = "\\^$*+?.()|{}[]";
+    var regexChars = ["^"];
+    for (var i = 0; i < glob.length; ++i) 
+    {
+        var c = glob.charAt(i);
+        switch (c) 
+        {
+            case '?':
+                regexChars.push(".");
+                break;
+            case '*':
+                regexChars.push(".*");
+                break;
+            default:
+                if (specialChars.indexOf(c) >= 0) 
+                {
+                    regexChars.push("\\");
+                }
+                regexChars.push(c);
+        }
+    }
+    regexChars.push("$");
+    return new RegExp(regexChars.join(""));
+}
+
+
+
+exports.doSync = doSync;
+
+main();
+
+
