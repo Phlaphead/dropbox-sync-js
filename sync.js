@@ -1115,15 +1115,18 @@ function isExcluded(path)
 	var pathItems = path.split("/");
 	var name = pathItems[pathItems.length-1];
 
-	for(var i = 0; i < settings.exclude.length; i++)
+	if (settings.exclude)
 	{
-		for(var j = 0; j < pathItems.length; j++)
+		for(var i = 0; i < settings.exclude.length; i++)
 		{
-			var pattern = settings.exclude[i];
-			var regex = globToRegex(pattern);
-			if(regex.test(pathItems[j]))
+			for(var j = 0; j < pathItems.length; j++)
 			{
-				return true;
+				var pattern = settings.exclude[i];
+				var regex = globToRegex(pattern);
+				if(regex.test(pathItems[j]))
+				{
+					return true;
+				}
 			}
 		}
 	}
